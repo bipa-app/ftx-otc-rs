@@ -1,2 +1,4 @@
 /target
+/rust-analyzer
 Cargo.lock
+src/main.rs
