@@ -1,11 +1,13 @@
 use chrono::{DateTime, Utc};
 use failure::Fail;
 use hmac::{Hmac, Mac, NewMac};
-use reqwest::{Client, Method, header::{self, CONTENT_TYPE}};
+use reqwest::{
+    header::{self, CONTENT_TYPE},
+    Client, Method,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Sha256;
-
 
 const FTX_OTC_URL: &str = "https://otc.ftx.com/api";
 
@@ -19,7 +21,10 @@ fn build_client(api_key: &str, signature: String, date: DateTime<Utc>) -> Result
     headers.insert("FTX-APIKEY", api_key);
     headers.insert("FTX-TIMESTAMP", timestamp);
     headers.insert("FTX-SIGNATURE", signature);
-    headers.insert(CONTENT_TYPE, header::HeaderValue::from_static("application/json"));
+    headers.insert(
+        CONTENT_TYPE,
+        header::HeaderValue::from_static("application/json"),
+    );
 
     reqwest::Client::builder()
         .default_headers(headers)
@@ -35,14 +40,8 @@ fn sign(
     date: DateTime<Utc>,
     body: Option<Value>,
 ) -> String {
-    let mut mac =
-        HmacSha256::new_varkey(secret.as_bytes()).expect("could not load hmac");
-    let mut param = format!(
-        "{}{}{}",
-        date.timestamp_millis(),
-        method.to_string(),
-        path
-    );
+    let mut mac = HmacSha256::new_varkey(secret.as_bytes()).expect("could not load hmac");
+    let mut param = format!("{}{}{}", date.timestamp_millis(), method.to_string(), path);
 
     if let Some(body) = body {
         param = format!("{}{}", param, body.to_string());
@@ -59,13 +58,13 @@ fn sign(
 pub enum Side {
     Buy,
     Sell,
-    TwoWay
+    TwoWay,
 }
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RequestQuote {
-    base_currency: String,
-    quote_currency: String,
+    base_currency: FtxCurrency,
+    quote_currency: FtxCurrency,
     // either this or quote_currency_size needs to be specified
     base_currency_size: Option<f64>,
     // either this or base_currency_size needs to be specified
@@ -76,26 +75,11 @@ pub struct RequestQuote {
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct RequestedQuote {
-    id: i64,
-    side: Side,
-    base_currency: String,
-    quote_currency: String,
-    base_currency_size: Option<f64>,
-    quote_currency_size: Option<f64>,
-    price: f64,
-    requested_at: DateTime<Utc>,
-    quoted_at: DateTime<Utc>,
-    expiry: DateTime<Utc>,
-}
-
-#[derive(Deserialize, Debug)]
 pub struct FtxResponse<Data> {
-    success: bool,
-    result: Option<Data>,
-    error: Option<String>,
-    error_code: Option<i32>,
+    pub success: bool,
+    pub result: Option<Data>,
+    pub error: Option<String>,
+    pub error_code: Option<i32>,
 }
 
 #[derive(Debug, Fail)]
@@ -120,21 +104,63 @@ impl From<reqwest::Error> for Error {
     }
 }
 
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Quote {
+    pub id: i64,
+    pub side: Side,
+    pub base_currency: FtxCurrency,
+    pub quote_currency: FtxCurrency,
+    pub base_currency_size: Option<f64>,
+    pub quote_currency_size: Option<f64>,
+    pub proceeds: f64,
+    pub proceeds_currency: FtxCurrency,
+    pub cost: f64,
+    pub cost_currency: FtxCurrency,
+    pub order_id: Option<i64>,
+    pub price: f64,
+    pub requested_at: DateTime<Utc>,
+    pub quoted_at: DateTime<Utc>,
+    pub expiry: DateTime<Utc>,
+}
+
+pub async fn accept_quote(
+    api_key: &str,
+    api_secret: &str,
+    quote_id: i64,
+) -> Result<FtxResponse<Quote>, Error> {
+    let path = format!("/otc/quotes/{}/accept", quote_id);
+    let now = Utc::now();
+    let signature = sign(api_secret, Method::POST, path.clone(), now, None);
+
+    let client = build_client(api_key, signature, now)?;
+
+    let resp = client
+        .post(&format!("{}{}", FTX_OTC_URL, path))
+        .send()
+        .await?
+        .json::<Value>()
+        .await?;
+
+    serde_json::from_value::<FtxResponse<Quote>>(resp.clone())
+        .map_err(|err| Error::DecodingError(resp, err))
+}
 
 pub async fn request_quote(
     api_key: &str,
     api_secret: &str,
-    base_currency: String,
-    quote_currency: String,
+    base_currency: FtxCurrency,
+    quote_currency: FtxCurrency,
     side: Side,
     base_currency_size: Option<f64>,
     quote_currency_size: Option<f64>,
-) -> Result<FtxResponse<RequestedQuote>, Error> {
+) -> Result<FtxResponse<Quote>, Error> {
     assert!(side != Side::TwoWay);
+    assert!(base_currency_size != None || quote_currency_size != None);
 
     let body = RequestQuote {
-        base_currency: base_currency.clone(),
-        quote_currency: quote_currency.clone(),
+        base_currency,
+        quote_currency,
         side,
         base_currency_size,
         quote_currency_size,
@@ -144,7 +170,13 @@ pub async fn request_quote(
     let path = format!("/otc/quotes");
     let now = Utc::now();
     let value = serde_json::to_value(body.clone())?;
-    let signature = sign(api_secret, Method::POST, path.clone(), now, Some(value.clone()));
+    let signature = sign(
+        api_secret,
+        Method::POST,
+        path.clone(),
+        now,
+        Some(value.clone()),
+    );
 
     let client = build_client(api_key, signature, now)?;
 
@@ -156,19 +188,20 @@ pub async fn request_quote(
         .json::<Value>()
         .await?;
 
-    serde_json::from_value::<FtxResponse<RequestedQuote>>(resp.clone())
+    serde_json::from_value::<FtxResponse<Quote>>(resp.clone())
         .map_err(|err| Error::DecodingError(resp, err))
 }
-
 
 pub async fn request_two_way_quotes(
     api_key: &str,
     api_secret: &str,
-    base_currency: String,
-    quote_currency: String,
+    base_currency: FtxCurrency,
+    quote_currency: FtxCurrency,
     base_currency_size: Option<f64>,
     quote_currency_size: Option<f64>,
-) -> Result<FtxResponse<Vec<RequestedQuote>>, Error> {
+) -> Result<FtxResponse<Vec<Quote>>, Error> {
+    assert!(base_currency_size != None || quote_currency_size != None);
+
     let body = RequestQuote {
         base_currency: base_currency.clone(),
         quote_currency: quote_currency.clone(),
@@ -181,7 +214,13 @@ pub async fn request_two_way_quotes(
     let path = format!("/otc/quotes");
     let now = Utc::now();
     let value = serde_json::to_value(body.clone())?;
-    let signature = sign(api_secret, Method::POST, path.clone(), now, Some(value.clone()));
+    let signature = sign(
+        api_secret,
+        Method::POST,
+        path.clone(),
+        now,
+        Some(value.clone()),
+    );
 
     let client = build_client(api_key, signature, now)?;
 
@@ -193,35 +232,33 @@ pub async fn request_two_way_quotes(
         .json::<Value>()
         .await?;
 
-    serde_json::from_value::<FtxResponse<Vec<RequestedQuote>>>(resp.clone())
+    serde_json::from_value::<FtxResponse<Vec<Quote>>>(resp.clone())
         .map_err(|err| Error::DecodingError(resp, err))
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum FtxCurrency {
     Btc,
-    Brl
+    Brl,
 }
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FtxAssetBalance {
-    currency: FtxCurrency,
-    total: f64,
-    locked: f64,
-    unsettled_proceeds: f64,
-    unsettled_costs: f64,
-    overall: f64
+    pub currency: FtxCurrency,
+    pub total: f64,
+    pub locked: f64,
+    pub unsettled_proceeds: f64,
+    pub unsettled_costs: f64,
+    pub overall: f64,
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "UPPERCASE")]
 pub struct FtxBalances {
-    btc: FtxAssetBalance,
-    brl: FtxAssetBalance
+    pub btc: FtxAssetBalance,
+    pub brl: FtxAssetBalance,
 }
-
-
 
 pub async fn get_ftx_balances(
     api_key: &str,
