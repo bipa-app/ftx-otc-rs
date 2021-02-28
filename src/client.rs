@@ -196,3 +196,50 @@ pub async fn request_two_way_quotes(
     serde_json::from_value::<FtxResponse<Vec<RequestedQuote>>>(resp.clone())
         .map_err(|err| Error::DecodingError(resp, err))
 }
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum FtxCurrency {
+    Btc,
+    Brl
+}
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FtxAssetBalance {
+    currency: FtxCurrency,
+    total: f64,
+    locked: f64,
+    unsettled_proceeds: f64,
+    unsettled_costs: f64,
+    overall: f64
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "UPPERCASE")]
+pub struct FtxBalances {
+    btc: FtxAssetBalance,
+    brl: FtxAssetBalance
+}
+
+
+
+pub async fn get_ftx_balances(
+    api_key: &str,
+    api_secret: &str,
+) -> Result<FtxResponse<FtxBalances>, Error> {
+    let path = format!("/balances");
+    let now = Utc::now();
+    let signature = sign(api_secret, Method::GET, path.clone(), now, None);
+
+    let client = build_client(api_key, signature, now)?;
+
+    let resp = client
+        .get(&format!("{}{}", FTX_OTC_URL, path))
+        .send()
+        .await?
+        .json::<Value>()
+        .await?;
+
+    serde_json::from_value::<FtxResponse<FtxBalances>>(resp.clone())
+        .map_err(|err| Error::DecodingError(resp, err))
+}
