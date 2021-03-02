@@ -122,6 +122,7 @@ pub struct Quote {
     pub requested_at: DateTime<Utc>,
     pub quoted_at: DateTime<Utc>,
     pub expiry: DateTime<Utc>,
+    pub user_fully_settled_at: Option<DateTime<Utc>>
 }
 
 pub async fn accept_quote(
