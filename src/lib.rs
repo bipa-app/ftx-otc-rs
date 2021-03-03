@@ -90,6 +90,8 @@ pub enum Error {
     DecodingError(Value, serde_json::Error),
     #[fail(display = "Networking: {:?}", _0)]
     Networking(reqwest::Error),
+    #[fail(display = "FtxResponseError: {} ({})", _0, _1)]
+    FtxResponseError(String, i32),
 }
 
 impl From<serde_json::Error> for Error {
@@ -122,14 +124,10 @@ pub struct Quote {
     pub requested_at: DateTime<Utc>,
     pub quoted_at: DateTime<Utc>,
     pub expiry: DateTime<Utc>,
-    pub user_fully_settled_at: Option<DateTime<Utc>>
+    pub user_fully_settled_at: Option<DateTime<Utc>>,
 }
 
-pub async fn accept_quote(
-    api_key: &str,
-    api_secret: &str,
-    quote_id: i64,
-) -> Result<FtxResponse<Quote>, Error> {
+pub async fn accept_quote(api_key: &str, api_secret: &str, quote_id: i64) -> Result<Quote, Error> {
     let path = format!("/otc/quotes/{}/accept", quote_id);
     let now = Utc::now();
     let signature = sign(api_secret, Method::POST, path.clone(), now, None);
@@ -143,8 +141,17 @@ pub async fn accept_quote(
         .json::<Value>()
         .await?;
 
-    serde_json::from_value::<FtxResponse<Quote>>(resp.clone())
-        .map_err(|err| Error::DecodingError(resp, err))
+    let response = serde_json::from_value::<FtxResponse<Quote>>(resp.clone())
+        .map_err(|err| Error::DecodingError(resp, err))?;
+
+    if !response.success || response.result.is_none() {
+        return Err(Error::FtxResponseError(
+            response.error.unwrap_or("FTX Unknown error".to_string()),
+            response.error_code.unwrap_or(-1),
+        ));
+    }
+
+    Ok(response.result.unwrap())
 }
 
 pub async fn request_quote(
@@ -155,7 +162,7 @@ pub async fn request_quote(
     side: Side,
     base_currency_size: Option<f64>,
     quote_currency_size: Option<f64>,
-) -> Result<FtxResponse<Quote>, Error> {
+) -> Result<Quote, Error> {
     assert!(side != Side::TwoWay);
     assert!(base_currency_size != None || quote_currency_size != None);
 
@@ -189,8 +196,17 @@ pub async fn request_quote(
         .json::<Value>()
         .await?;
 
-    serde_json::from_value::<FtxResponse<Quote>>(resp.clone())
-        .map_err(|err| Error::DecodingError(resp, err))
+    let response = serde_json::from_value::<FtxResponse<Quote>>(resp.clone())
+        .map_err(|err| Error::DecodingError(resp, err))?;
+
+    if !response.success || response.result.is_none() {
+        return Err(Error::FtxResponseError(
+            response.error.unwrap_or("FTX Unknown error".to_string()),
+            response.error_code.unwrap_or(-1),
+        ));
+    }
+
+    Ok(response.result.unwrap())
 }
 
 pub async fn request_two_way_quotes(
@@ -200,7 +216,7 @@ pub async fn request_two_way_quotes(
     quote_currency: FtxCurrency,
     base_currency_size: Option<f64>,
     quote_currency_size: Option<f64>,
-) -> Result<FtxResponse<Vec<Quote>>, Error> {
+) -> Result<Vec<Quote>, Error> {
     assert!(base_currency_size != None || quote_currency_size != None);
 
     let body = RequestQuote {
@@ -233,8 +249,17 @@ pub async fn request_two_way_quotes(
         .json::<Value>()
         .await?;
 
-    serde_json::from_value::<FtxResponse<Vec<Quote>>>(resp.clone())
-        .map_err(|err| Error::DecodingError(resp, err))
+    let response = serde_json::from_value::<FtxResponse<Vec<Quote>>>(resp.clone())
+        .map_err(|err| Error::DecodingError(resp, err))?;
+
+    if !response.success || response.result.is_none() {
+        return Err(Error::FtxResponseError(
+            response.error.unwrap_or("FTX Unknown error".to_string()),
+            response.error_code.unwrap_or(-1),
+        ));
+    }
+
+    Ok(response.result.unwrap())
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -261,10 +286,7 @@ pub struct FtxBalances {
     pub brl: FtxAssetBalance,
 }
 
-pub async fn get_ftx_balances(
-    api_key: &str,
-    api_secret: &str,
-) -> Result<FtxResponse<FtxBalances>, Error> {
+pub async fn get_ftx_balances(api_key: &str, api_secret: &str) -> Result<FtxBalances, Error> {
     let path = format!("/balances");
     let now = Utc::now();
     let signature = sign(api_secret, Method::GET, path.clone(), now, None);
@@ -278,6 +300,15 @@ pub async fn get_ftx_balances(
         .json::<Value>()
         .await?;
 
-    serde_json::from_value::<FtxResponse<FtxBalances>>(resp.clone())
-        .map_err(|err| Error::DecodingError(resp, err))
+    let response = serde_json::from_value::<FtxResponse<FtxBalances>>(resp.clone())
+        .map_err(|err| Error::DecodingError(resp, err))?;
+
+    if !response.success || response.result.is_none() {
+        return Err(Error::FtxResponseError(
+            response.error.unwrap_or("FTX Unknown error".to_string()),
+            response.error_code.unwrap_or(-1),
+        ));
+    }
+
+    Ok(response.result.unwrap())
 }
