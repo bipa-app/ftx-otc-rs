@@ -123,7 +123,7 @@ pub struct Quote {
     pub price: f64,
     pub requested_at: DateTime<Utc>,
     pub quoted_at: DateTime<Utc>,
-    pub expiry: DateTime<Utc>,
+    pub expiry: Option<DateTime<Utc>>,
     pub user_fully_settled_at: Option<DateTime<Utc>>,
 }
 
