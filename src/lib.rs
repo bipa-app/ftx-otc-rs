@@ -154,6 +154,46 @@ pub async fn accept_quote(api_key: &str, api_secret: &str, quote_id: i64) -> Res
     Ok(response.result.unwrap())
 }
 
+pub async fn accept_quote_custom_size(
+    api_key: &str,
+    api_secret: &str,
+    quote_id: i64,
+    custom_size: f64,
+) -> Result<Quote, Error> {
+    let path = format!("/otc/quotes/{}/accept", quote_id);
+    let now = Utc::now();
+    let params = serde_json::json!({ "customSize": custom_size });
+    let signature = sign(
+        api_secret,
+        Method::POST,
+        path.clone(),
+        now,
+        Some(params.clone()),
+    );
+
+    let client = build_client(api_key, signature, now)?;
+
+    let resp = client
+        .post(&format!("{}{}", FTX_OTC_URL, path))
+        .json(&params)
+        .send()
+        .await?
+        .json::<Value>()
+        .await?;
+
+    let response = serde_json::from_value::<FtxResponse<Quote>>(resp.clone())
+        .map_err(|err| Error::DecodingError(resp, err))?;
+
+    if !response.success || response.result.is_none() {
+        return Err(Error::FtxResponseError(
+            response.error.unwrap_or("FTX Unknown error".to_string()),
+            response.error_code.unwrap_or(-1),
+        ));
+    }
+
+    Ok(response.result.unwrap())
+}
+
 pub async fn request_quote(
     api_key: &str,
     api_secret: &str,
