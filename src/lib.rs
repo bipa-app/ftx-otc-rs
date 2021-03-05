@@ -86,8 +86,8 @@ pub struct FtxResponse<Data> {
 pub enum Error {
     #[fail(display = "SerdeJsonError {}", _0)]
     SerdeJsonError(serde_json::Error),
-    #[fail(display = "DecodingError {:?} - {}", _0, _1)]
-    DecodingError(Value, serde_json::Error),
+    #[fail(display = "DecodingError {:?}", _0)]
+    DecodingError(serde_json::Error),
     #[fail(display = "Networking: {:?}", _0)]
     Networking(reqwest::Error),
     #[fail(display = "FtxResponseError: {} ({})", _0, _1)]
@@ -115,9 +115,9 @@ pub struct Quote {
     pub quote_currency: FtxCurrency,
     pub base_currency_size: Option<f64>,
     pub quote_currency_size: Option<f64>,
-    pub proceeds: f64,
+    pub proceeds: Option<f64>,
     pub proceeds_currency: FtxCurrency,
-    pub cost: f64,
+    pub cost: Option<f64>,
     pub cost_currency: FtxCurrency,
     pub order_id: Option<i64>,
     pub price: Option<f64>,
@@ -142,7 +142,7 @@ pub async fn accept_quote(api_key: &str, api_secret: &str, quote_id: i64) -> Res
         .await?;
 
     let response = serde_json::from_value::<FtxResponse<Quote>>(resp.clone())
-        .map_err(|err| Error::DecodingError(resp, err))?;
+        .map_err(|err| Error::DecodingError(err))?;
 
     if !response.success || response.result.is_none() {
         return Err(Error::FtxResponseError(
@@ -197,7 +197,7 @@ pub async fn request_quote(
         .await?;
 
     let response = serde_json::from_value::<FtxResponse<Quote>>(resp.clone())
-        .map_err(|err| Error::DecodingError(resp, err))?;
+        .map_err(|err| Error::DecodingError(err))?;
 
     if !response.success || response.result.is_none() {
         return Err(Error::FtxResponseError(
@@ -250,7 +250,7 @@ pub async fn request_two_way_quotes(
         .await?;
 
     let response = serde_json::from_value::<FtxResponse<Vec<Quote>>>(resp.clone())
-        .map_err(|err| Error::DecodingError(resp, err))?;
+        .map_err(|err| Error::DecodingError(err))?;
 
     if !response.success || response.result.is_none() {
         return Err(Error::FtxResponseError(
@@ -301,7 +301,7 @@ pub async fn get_ftx_balances(api_key: &str, api_secret: &str) -> Result<FtxBala
         .await?;
 
     let response = serde_json::from_value::<FtxResponse<FtxBalances>>(resp.clone())
-        .map_err(|err| Error::DecodingError(resp, err))?;
+        .map_err(|err| Error::DecodingError(err))?;
 
     if !response.success || response.result.is_none() {
         return Err(Error::FtxResponseError(
