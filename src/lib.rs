@@ -120,7 +120,7 @@ pub struct Quote {
     pub cost: f64,
     pub cost_currency: FtxCurrency,
     pub order_id: Option<i64>,
-    pub price: f64,
+    pub price: Option<f64>,
     pub requested_at: DateTime<Utc>,
     pub quoted_at: DateTime<Utc>,
     pub expiry: Option<DateTime<Utc>>,
