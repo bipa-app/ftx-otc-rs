@@ -267,6 +267,7 @@ pub async fn request_two_way_quotes(
 pub enum FtxCurrency {
     Btc,
     Brl,
+    Brz
 }
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -284,6 +285,7 @@ pub struct FtxAssetBalance {
 pub struct FtxBalances {
     pub btc: FtxAssetBalance,
     pub brl: FtxAssetBalance,
+    pub brz: FtxAssetBalance,
 }
 
 pub async fn get_ftx_balances(api_key: &str, api_secret: &str) -> Result<FtxBalances, Error> {
