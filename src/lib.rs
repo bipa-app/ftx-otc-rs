@@ -1,5 +1,4 @@
 use chrono::{DateTime, Utc};
-use failure::Fail;
 use hmac::{Hmac, Mac, NewMac};
 use reqwest::{
     header::{self, CONTENT_TYPE},
@@ -82,15 +81,15 @@ pub struct FtxResponse<Data> {
     pub error_code: Option<i32>,
 }
 
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[fail(display = "SerdeJsonError {}", _0)]
+    #[error("SerdeJsonError {0}")]
     SerdeJsonError(serde_json::Error),
-    #[fail(display = "DecodingError {:?}", _0)]
+    #[error("DecodingError {0:?}")]
     DecodingError(serde_json::Error),
-    #[fail(display = "Networking: {:?}", _0)]
+    #[error("Networking: {0:?}")]
     Networking(reqwest::Error),
-    #[fail(display = "FtxResponseError: {} ({})", _0, _1)]
+    #[error("FtxResponseError: {0} ({1})")]
     FtxResponseError(String, i32),
 }
 
@@ -267,7 +266,7 @@ pub async fn request_two_way_quotes(
 pub enum FtxCurrency {
     Btc,
     Brl,
-    Brz
+    Brz,
 }
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
