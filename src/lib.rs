@@ -267,7 +267,9 @@ pub enum FtxCurrency {
     Btc,
     Brl,
     Brz,
+    Paxg,
 }
+
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FtxAssetBalance {
@@ -285,6 +287,7 @@ pub struct FtxBalances {
     pub btc: FtxAssetBalance,
     pub brl: FtxAssetBalance,
     pub brz: FtxAssetBalance,
+    pub paxg: FtxAssetBalance,
 }
 
 pub async fn get_ftx_balances(api_key: &str, api_secret: &str) -> Result<FtxBalances, Error> {
