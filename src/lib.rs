@@ -126,6 +126,46 @@ pub struct Quote {
     pub user_fully_settled_at: Option<DateTime<Utc>>,
 }
 
+pub async fn accept_quote_with_custom_size(
+    api_key: &str,
+    api_secret: &str,
+    quote_id: i64,
+    custom_size: f64,
+) -> Result<Quote, Error> {
+    let path = format!("/otc/quotes/{}/accept", quote_id);
+    let now = Utc::now();
+    let body = serde_json::json!({ "customSize": custom_size });
+    let signature = sign(
+        api_secret,
+        Method::POST,
+        path.clone(),
+        now,
+        Some(body.clone()),
+    );
+
+    let client = build_client(api_key, signature, now)?;
+
+    let resp = client
+        .post(&format!("{}{}", FTX_OTC_URL, path))
+        .json(&body)
+        .send()
+        .await?
+        .json::<Value>()
+        .await?;
+
+    let response = serde_json::from_value::<FtxResponse<Quote>>(resp.clone())
+        .map_err(|err| Error::DecodingError(err))?;
+
+    if !response.success || response.result.is_none() {
+        return Err(Error::FtxResponseError(
+            response.error.unwrap_or("FTX Unknown error".to_string()),
+            response.error_code.unwrap_or(-1),
+        ));
+    }
+
+    Ok(response.result.unwrap())
+}
+
 pub async fn accept_quote(api_key: &str, api_secret: &str, quote_id: i64) -> Result<Quote, Error> {
     let path = format!("/otc/quotes/{}/accept", quote_id);
     let now = Utc::now();
@@ -267,7 +307,9 @@ pub enum FtxCurrency {
     Btc,
     Brl,
     Brz,
+    Paxg,
 }
+
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FtxAssetBalance {
@@ -285,6 +327,7 @@ pub struct FtxBalances {
     pub btc: FtxAssetBalance,
     pub brl: FtxAssetBalance,
     pub brz: FtxAssetBalance,
+    pub paxg: FtxAssetBalance,
 }
 
 pub async fn get_ftx_balances(api_key: &str, api_secret: &str) -> Result<FtxBalances, Error> {
