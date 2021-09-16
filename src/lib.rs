@@ -39,7 +39,7 @@ fn sign(
     date: DateTime<Utc>,
     body: Option<Value>,
 ) -> String {
-    let mut mac = HmacSha256::new_varkey(secret.as_bytes()).expect("could not load hmac");
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).expect("could not load hmac");
     let mut param = format!("{}{}{}", date.timestamp_millis(), method.to_string(), path);
 
     if let Some(body) = body {
