@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use hmac::{Hmac, Mac, NewMac};
 use reqwest::{
-    header::{self, CONTENT_TYPE},
+    header::{self, InvalidHeaderValue, CONTENT_TYPE},
     Client, Method,
 };
 use serde::{Deserialize, Serialize};
@@ -12,11 +12,12 @@ const FTX_OTC_URL: &str = "https://otc.ftx.com/api";
 
 fn build_client(api_key: &str, signature: String, date: DateTime<Utc>) -> Result<Client, Error> {
     let mut headers = header::HeaderMap::new();
-    let api_key = header::HeaderValue::from_str(&api_key).expect("Invalid header value");
-    let signature = header::HeaderValue::from_str(&signature).expect("Invalid header value");
+    let api_key = header::HeaderValue::from_str(&api_key).map_err(Error::HeaderError)?;
+    let signature = header::HeaderValue::from_str(&signature).map_err(Error::HeaderError)?;
     let ts = date.timestamp_millis();
     let timestamp =
-        header::HeaderValue::from_str(&format!("{}", ts)).expect("Invalid header value");
+        header::HeaderValue::from_str(&format!("{}", ts)).map_err(Error::HeaderError)?;
+
     headers.insert("FTX-APIKEY", api_key);
     headers.insert("FTX-TIMESTAMP", timestamp);
     headers.insert("FTX-SIGNATURE", signature);
@@ -91,6 +92,8 @@ pub enum Error {
     Networking(reqwest::Error),
     #[error("FtxResponseError: {0} ({1})")]
     FtxResponseError(String, i32),
+    #[error("Invalid Header Errror: {0:?}")]
+    HeaderError(InvalidHeaderValue),
 }
 
 impl From<serde_json::Error> for Error {
