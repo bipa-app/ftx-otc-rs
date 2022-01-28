@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use hmac::{Hmac, Mac, NewMac};
+use hmac::{crypto_mac::InvalidKeyLength, Hmac, Mac, NewMac};
 use reqwest::{
     header::{self, InvalidHeaderValue, CONTENT_TYPE},
     Client, Method,
@@ -39,8 +39,8 @@ fn sign(
     path: String,
     date: DateTime<Utc>,
     body: Option<Value>,
-) -> String {
-    let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).expect("could not load hmac");
+) -> Result<String, Error> {
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).map_err(Error::InvalidHmacKey)?;
     let mut param = format!("{}{}{}", date.timestamp_millis(), method.to_string(), path);
 
     if let Some(body) = body {
@@ -50,7 +50,7 @@ fn sign(
     mac.update(param.as_bytes());
     let result = mac.finalize();
     let code_bytes = result.into_bytes();
-    hex::encode(code_bytes)
+    Ok(hex::encode(code_bytes))
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -92,8 +92,10 @@ pub enum Error {
     Networking(reqwest::Error),
     #[error("FtxResponseError: {0} ({1})")]
     FtxResponseError(String, i32),
-    #[error("Invalid Header Errror: {0:?}")]
+    #[error("Invalid Header Error: {0:?}")]
     HeaderError(InvalidHeaderValue),
+    #[error("Error decoding Hmac: {0:?}")]
+    InvalidHmacKey(InvalidKeyLength),
 }
 
 impl From<serde_json::Error> for Error {
@@ -144,7 +146,7 @@ pub async fn accept_quote_with_custom_size(
         path.clone(),
         now,
         Some(body.clone()),
-    );
+    )?;
 
     let client = build_client(api_key, signature, now)?;
 
@@ -172,7 +174,7 @@ pub async fn accept_quote_with_custom_size(
 pub async fn accept_quote(api_key: &str, api_secret: &str, quote_id: i64) -> Result<Quote, Error> {
     let path = format!("/otc/quotes/{}/accept", quote_id);
     let now = Utc::now();
-    let signature = sign(api_secret, Method::POST, path.clone(), now, None);
+    let signature = sign(api_secret, Method::POST, path.clone(), now, None)?;
 
     let client = build_client(api_key, signature, now)?;
 
@@ -226,7 +228,7 @@ pub async fn request_quote(
         path.clone(),
         now,
         Some(value.clone()),
-    );
+    )?;
 
     let client = build_client(api_key, signature, now)?;
 
@@ -279,7 +281,7 @@ pub async fn request_two_way_quotes(
         path.clone(),
         now,
         Some(value.clone()),
-    );
+    )?;
 
     let client = build_client(api_key, signature, now)?;
 
@@ -336,7 +338,7 @@ pub struct FtxBalances {
 pub async fn get_ftx_balances(api_key: &str, api_secret: &str) -> Result<FtxBalances, Error> {
     let path = format!("/balances");
     let now = Utc::now();
-    let signature = sign(api_secret, Method::GET, path.clone(), now, None);
+    let signature = sign(api_secret, Method::GET, path.clone(), now, None)?;
 
     let client = build_client(api_key, signature, now)?;
 
