@@ -330,7 +330,6 @@ pub struct FtxAssetBalance {
 #[serde(rename_all = "UPPERCASE")]
 pub struct FtxBalances {
     pub btc: FtxAssetBalance,
-    pub brl: FtxAssetBalance,
     pub brz: FtxAssetBalance,
     pub paxg: FtxAssetBalance,
 }
