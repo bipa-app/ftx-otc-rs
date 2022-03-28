@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use hmac::{crypto_mac::InvalidKeyLength, Hmac, Mac, NewMac};
+use hmac::{Hmac, Mac};
 use reqwest::{
     header::{self, InvalidHeaderValue, CONTENT_TYPE},
     Client, Method,
@@ -95,7 +95,7 @@ pub enum Error {
     #[error("Invalid Header Error: {0:?}")]
     HeaderError(InvalidHeaderValue),
     #[error("Error decoding Hmac: {0:?}")]
-    InvalidHmacKey(InvalidKeyLength),
+    InvalidHmacKey(hmac::digest::InvalidLength),
 }
 
 impl From<serde_json::Error> for Error {
