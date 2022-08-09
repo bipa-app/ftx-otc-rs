@@ -207,8 +207,8 @@ pub async fn request_quote(
     base_currency_size: Option<f64>,
     quote_currency_size: Option<f64>,
 ) -> Result<Quote, Error> {
-    assert!(side != Side::TwoWay);
-    assert!(base_currency_size != None || quote_currency_size != None);
+    debug_assert!(side != Side::TwoWay);
+    debug_assert!(base_currency_size != None || quote_currency_size != None);
 
     let body = RequestQuote {
         base_currency,
@@ -261,7 +261,7 @@ pub async fn request_two_way_quotes(
     base_currency_size: Option<f64>,
     quote_currency_size: Option<f64>,
 ) -> Result<Vec<Quote>, Error> {
-    assert!(base_currency_size != None || quote_currency_size != None);
+    debug_assert!(base_currency_size != None || quote_currency_size != None);
 
     let body = RequestQuote {
         base_currency: base_currency.clone(),
