@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use chrono::{DateTime, Utc};
 use hmac::{Hmac, Mac};
 use reqwest::{
@@ -9,6 +11,7 @@ use serde_json::Value;
 use sha2::Sha256;
 
 const FTX_OTC_URL: &str = "https://otc.ftx.com/api";
+const TIMEOUT_SECS: u64 = 60;
 
 fn build_client(api_key: &str, signature: String, date: DateTime<Utc>) -> Result<Client, Error> {
     let mut headers = header::HeaderMap::new();
@@ -28,6 +31,7 @@ fn build_client(api_key: &str, signature: String, date: DateTime<Utc>) -> Result
 
     reqwest::Client::builder()
         .default_headers(headers)
+        .timeout(Duration::from_secs(TIMEOUT_SECS))
         .build()
         .map_err(Into::into)
 }
