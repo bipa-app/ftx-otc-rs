@@ -15,7 +15,7 @@ const TIMEOUT_SECS: u64 = 60;
 
 fn build_client(api_key: &str, signature: String, date: DateTime<Utc>) -> Result<Client, Error> {
     let mut headers = header::HeaderMap::new();
-    let api_key = header::HeaderValue::from_str(&api_key).map_err(Error::HeaderError)?;
+    let api_key = header::HeaderValue::from_str(api_key).map_err(Error::HeaderError)?;
     let signature = header::HeaderValue::from_str(&signature).map_err(Error::HeaderError)?;
     let ts = date.timestamp_millis();
     let timestamp =
@@ -45,10 +45,10 @@ fn sign(
     body: Option<Value>,
 ) -> Result<String, Error> {
     let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).map_err(Error::InvalidHmacKey)?;
-    let mut param = format!("{}{}{}", date.timestamp_millis(), method.to_string(), path);
+    let mut param = format!("{}{}{}", date.timestamp_millis(), method, path);
 
     if let Some(body) = body {
-        param = format!("{}{}", param, body.to_string());
+        param = format!("{}{}", param, body);
     }
 
     mac.update(param.as_bytes());
@@ -162,12 +162,14 @@ pub async fn accept_quote_with_custom_size(
         .json::<Value>()
         .await?;
 
-    let response = serde_json::from_value::<FtxResponse<Quote>>(resp.clone())
-        .map_err(|err| Error::DecodingError(err))?;
+    let response =
+        serde_json::from_value::<FtxResponse<Quote>>(resp).map_err(Error::DecodingError)?;
 
     if !response.success || response.result.is_none() {
         return Err(Error::FtxResponseError(
-            response.error.unwrap_or("FTX Unknown error".to_string()),
+            response
+                .error
+                .unwrap_or_else(|| "FTX Unknown error".to_string()),
             response.error_code.unwrap_or(-1),
         ));
     }
@@ -189,12 +191,14 @@ pub async fn accept_quote(api_key: &str, api_secret: &str, quote_id: i64) -> Res
         .json::<Value>()
         .await?;
 
-    let response = serde_json::from_value::<FtxResponse<Quote>>(resp.clone())
-        .map_err(|err| Error::DecodingError(err))?;
+    let response =
+        serde_json::from_value::<FtxResponse<Quote>>(resp).map_err(Error::DecodingError)?;
 
     if !response.success || response.result.is_none() {
         return Err(Error::FtxResponseError(
-            response.error.unwrap_or("FTX Unknown error".to_string()),
+            response
+                .error
+                .unwrap_or_else(|| "FTX Unknown error".to_string()),
             response.error_code.unwrap_or(-1),
         ));
     }
@@ -223,7 +227,7 @@ pub async fn request_quote(
         wait_for_price: true,
         api_only: true,
     };
-    let path = format!("/otc/quotes");
+    let path = "/otc/quotes".to_string();
     let now = Utc::now();
     let value = serde_json::to_value(body.clone())?;
     let signature = sign(
@@ -244,12 +248,14 @@ pub async fn request_quote(
         .json::<Value>()
         .await?;
 
-    let response = serde_json::from_value::<FtxResponse<Quote>>(resp.clone())
-        .map_err(|err| Error::DecodingError(err))?;
+    let response =
+        serde_json::from_value::<FtxResponse<Quote>>(resp).map_err(Error::DecodingError)?;
 
     if !response.success || response.result.is_none() {
         return Err(Error::FtxResponseError(
-            response.error.unwrap_or("FTX Unknown error".to_string()),
+            response
+                .error
+                .unwrap_or_else(|| "FTX Unknown error".to_string()),
             response.error_code.unwrap_or(-1),
         ));
     }
@@ -276,7 +282,7 @@ pub async fn request_two_way_quotes(
         wait_for_price: true,
         api_only: true,
     };
-    let path = format!("/otc/quotes");
+    let path = "/otc/quotes".to_string();
     let now = Utc::now();
     let value = serde_json::to_value(body.clone())?;
     let signature = sign(
@@ -297,12 +303,14 @@ pub async fn request_two_way_quotes(
         .json::<Value>()
         .await?;
 
-    let response = serde_json::from_value::<FtxResponse<Vec<Quote>>>(resp.clone())
-        .map_err(|err| Error::DecodingError(err))?;
+    let response =
+        serde_json::from_value::<FtxResponse<Vec<Quote>>>(resp).map_err(Error::DecodingError)?;
 
     if !response.success || response.result.is_none() {
         return Err(Error::FtxResponseError(
-            response.error.unwrap_or("FTX Unknown error".to_string()),
+            response
+                .error
+                .unwrap_or_else(|| "FTX Unknown error".to_string()),
             response.error_code.unwrap_or(-1),
         ));
     }
@@ -339,7 +347,7 @@ pub struct FtxBalances {
 }
 
 pub async fn get_ftx_balances(api_key: &str, api_secret: &str) -> Result<FtxBalances, Error> {
-    let path = format!("/balances");
+    let path = "/balances".to_string();
     let now = Utc::now();
     let signature = sign(api_secret, Method::GET, path.clone(), now, None)?;
 
@@ -352,12 +360,14 @@ pub async fn get_ftx_balances(api_key: &str, api_secret: &str) -> Result<FtxBala
         .json::<Value>()
         .await?;
 
-    let response = serde_json::from_value::<FtxResponse<FtxBalances>>(resp.clone())
-        .map_err(|err| Error::DecodingError(err))?;
+    let response =
+        serde_json::from_value::<FtxResponse<FtxBalances>>(resp).map_err(Error::DecodingError)?;
 
     if !response.success || response.result.is_none() {
         return Err(Error::FtxResponseError(
-            response.error.unwrap_or("FTX Unknown error".to_string()),
+            response
+                .error
+                .unwrap_or_else(|| "FTX Unknown error".to_string()),
             response.error_code.unwrap_or(-1),
         ));
     }
