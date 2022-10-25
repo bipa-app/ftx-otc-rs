@@ -163,7 +163,7 @@ pub async fn accept_quote_with_custom_size(
         .await?;
 
     let response =
-        serde_json::from_value::<FtxResponse<(i64, Quote)>>(resp).map_err(Error::DecodingError)?;
+        serde_json::from_value::<FtxResponse<Quote>>(resp).map_err(Error::DecodingError)?;
 
     if !response.success || response.result.is_none() {
         return Err(Error::FtxResponseError(
@@ -174,10 +174,7 @@ pub async fn accept_quote_with_custom_size(
         ));
     }
 
-    let (_, quote) = response.result.unwrap();
-
-    return Ok(quote);
-
+    Ok(response.result.unwrap())
 }
 
 pub async fn accept_quote(api_key: &str, api_secret: &str, quote_id: i64) -> Result<Quote, Error> {
@@ -195,7 +192,7 @@ pub async fn accept_quote(api_key: &str, api_secret: &str, quote_id: i64) -> Res
         .await?;
 
     let response =
-        serde_json::from_value::<FtxResponse<(i64, Quote)>>(resp).map_err(Error::DecodingError)?;
+        serde_json::from_value::<FtxResponse<Quote>>(resp).map_err(Error::DecodingError)?;
 
     if !response.success || response.result.is_none() {
         return Err(Error::FtxResponseError(
@@ -206,9 +203,7 @@ pub async fn accept_quote(api_key: &str, api_secret: &str, quote_id: i64) -> Res
         ));
     }
 
-    let (_, quote) = response.result.unwrap();
-
-    return Ok(quote);
+    Ok(response.result.unwrap())
 }
 
 pub async fn request_quote(
